@@ -1,30 +1,46 @@
 FROM alpine:edge
+MAINTAINER Hugh Pierce
 
-ENV TERM xterm
+# Default password
+ENV mysql_root_pwd=p@ssw0rd
 
-RUN apk add --update curl wget git mysql mysql-client \
-  bash nginx ca-certificates \
-  php-fpm php-json php-zlib php-xml php-pdo php-phar php-openssl \
-  php-pdo_mysql php-mysqli \
-  php-gd php-iconv php-mcrypt \
-  php-curl php-openssl php-json php-dom php-ctype && \
-  apk add -u musl && \
-  mkdir -p /var/lib/mysql && \
-  mkdir -p /etc/mysql/conf.d && \
-  mkdir -p /etc/nginx/conf.d && \
-  mkdir -p /var/run/mysql/ && \
-  curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer && \
-  rm -rf /var/cache/apk/*
+# Add packages
+RUN apk upgrade -U && \
+    apk --update --repository=http://dl-4.alpinelinux.org/alpine/edge/testing \
+    add php7 php7-xml php7-xsl php7-pdo_mysql php7-mcrypt php7-curl \
+    php7-json php7-fpm php7-phar php7-openssl php7-mysqli php7-ctype \
+    php7-opcache php7-mbstring curl wget git mysql mysql-client bash \ 
+    nginx ca-certificates
 
-ADD files/nginx.conf /etc/nginx/
-ADD files/php-fpm.conf /etc/php/
-ADD files/my.cnf /etc/mysql/
-ADD files/default.conf /etc/nginx/conf.d/
-ADD files/run.sh /
-RUN chmod +x /run.sh
+# Make directories
+RUN mkdir -p /var/lib/mysql /etc/mysql/conf.d /etc/nginx/conf.d \
+    /var/run/mysql/ /var/www/html /tmp/nginx /var/www/testdb /var/log/mysql \
+    /var/log/nginx
 
+# Fix php
+RUN sed -i 's@mysqli.default_socket =@mysqli.default_socket = /var/run/mysql/mysql.sock@' /etc/php7/php.ini
+
+# Copy files
+COPY html /var/www/html
+COPY test_db /var/www/test_db
+COPY files/nginx.conf /etc/nginx/
+COPY files/my.cnf /etc/mysql/
+COPY files/default.conf /etc/nginx/conf.d/
+COPY files/mysql.sh /
+COPY files/run.sh /
+
+# chmod executables
+RUN chmod +x /mysql.sh /run.sh
+
+# Change password from changeme to default
+RUN sed -i "s/changeme/$mysql_root_pwd/" /var/www/html/db.php /mysql.sh
+
+# Start mysql, load database, and verify database
+RUN /mysql.sh
+
+# Web port
 EXPOSE 80
-EXPOSE 3306
-WORKDIR /data/htdocs
-VOLUME ["/data/htdocs", "/data/logs", "/var/lib/mysql", "/etc/mysql/conf.d/"]
-CMD ["/run.sh"]
+
+# Start services
+ENTRYPOINT [ "/run.sh" ]
+
