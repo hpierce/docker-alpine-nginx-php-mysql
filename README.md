@@ -16,7 +16,3 @@ If ```--build-arg [...]``` is not set, MySQL credentials will be root:p@ssw0rd.
 #### ...in shell
 <pre><code>docker run -it -p 8080:80 hpierce/docker-alpine-nginx-php-mysql</code></pre>
 
-### See results
-Open your browser to http://localhost:8080
-
-
